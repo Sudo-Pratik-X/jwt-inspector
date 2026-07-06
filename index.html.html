@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JWT Inspector — by Pratik S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0d12;
+    --panel: #10141c;
+    --panel-2: #151a24;
+    --line: #232a38;
+    --text: #dbe2ec;
+    --muted: #6b7688;
+    --cyan: #4ce0d2;
+    --amber: #f5a623;
+    --red: #ff5470;
+    --green: #46d17a;
+    --violet: #9d8cff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1000px 500px at 15% -10%, rgba(76,224,210,0.06), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(157,140,255,0.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    min-height:100vh;
+    padding:32px 24px 80px;
+  }
+  .wrap{max-width:1280px; margin:0 auto;}
+
+  /* ---- header ---- */
+  header{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:28px; flex-wrap:wrap; gap:12px; border-bottom:1px solid var(--line); padding-bottom:20px;}
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg, var(--cyan), var(--violet)); display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; color:#04141a; font-size:15px;}
+  h1{font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:700; margin:0; letter-spacing:0.3px;}
+  .tagline{color:var(--muted); font-size:12.5px; margin-top:2px;}
+  .credit{color:var(--muted); font-size:11.5px; text-align:right; line-height:1.6;}
+  .credit b{color:var(--cyan); font-weight:600;}
+
+  /* ---- scan strip (signature element) ---- */
+  .scanstrip{position:relative; height:54px; border-radius:10px; overflow:hidden; display:flex; border:1px solid var(--line); margin-bottom:28px; background:var(--panel);}
+  .scanstrip .seg{position:relative; display:flex; align-items:center; justify-content:center; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#04141a; font-weight:700; cursor:default; transition:filter .2s;}
+  .scanstrip .seg:hover{filter:brightness(1.12);}
+  .seg.header{background:linear-gradient(135deg, var(--violet), #7d6ce0); flex:0 0 22%;}
+  .seg.payload{background:linear-gradient(135deg, var(--cyan), #33bdb0); flex:1;}
+  .seg.signature{background:linear-gradient(135deg, var(--amber), #e08d1a); flex:0 0 22%;}
+  .seg.empty{background:var(--panel-2); color:var(--muted); font-weight:500;}
+  .scanline{position:absolute; top:0; bottom:0; width:2px; background:rgba(255,255,255,0.85); box-shadow:0 0 12px 2px rgba(255,255,255,0.6); left:-5%; animation:scan 2.2s ease-in-out infinite; opacity:0;}
+  .scanning .scanline{opacity:1;}
+  @keyframes scan{0%{left:-2%;} 50%{left:100%;} 100%{left:-2%;}}
+  @media (prefers-reduced-motion: reduce){ .scanline{animation:none; opacity:0;} }
+
+  /* ---- layout ---- */
+  .grid{display:grid; grid-template-columns: 1.1fr 1fr; gap:20px;}
+  @media (max-width: 980px){ .grid{grid-template-columns: 1fr;} }
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 18px 20px;}
+  .panel + .panel{margin-top:20px;}
+  .panel h2{font-family:'Space Grotesk',sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin:0 0 12px; display:flex; align-items:center; justify-content:space-between; font-weight:600;}
+  .eyebrow-dot{width:6px; height:6px; border-radius:50%; background:var(--cyan); display:inline-block; margin-right:8px; box-shadow:0 0 6px var(--cyan);}
+
+  textarea{width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:12px; resize:vertical; min-height:110px; line-height:1.6;}
+  textarea:focus, input:focus, select:focus{outline:2px solid var(--cyan); outline-offset:1px;}
+  textarea.token-input{color:var(--cyan);}
+
+  pre.jsonview{background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:12px; font-size:12.5px; line-height:1.65; overflow-x:auto; margin:0; min-height:60px; white-space:pre-wrap; word-break:break-word;}
+  .jk{color:var(--violet);} .jv-str{color:var(--green);} .jv-num{color:var(--amber);} .jv-bool{color:var(--red);} .jv-null{color:var(--muted);}
+
+  .flags{display:flex; flex-direction:column; gap:8px; margin-top:12px;}
+  .flag{display:flex; gap:10px; align-items:flex-start; font-size:12px; padding:9px 11px; border-radius:7px; border:1px solid var(--line); background:var(--panel-2); line-height:1.5;}
+  .flag .ic{font-weight:700; flex:0 0 auto; width:16px; text-align:center;}
+  .flag.crit{border-color:rgba(255,84,112,0.4); background:rgba(255,84,112,0.07);}
+  .flag.crit .ic{color:var(--red);}
+  .flag.warn{border-color:rgba(245,166,35,0.4); background:rgba(245,166,35,0.07);}
+  .flag.warn .ic{color:var(--amber);}
+  .flag.ok{border-color:rgba(70,209,122,0.35); background:rgba(70,209,122,0.06);}
+  .flag.ok .ic{color:var(--green);}
+  .flag .label{color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px;}
+
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;}
+  input[type=text], input[type=password], select{background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:9px 11px;}
+  input[type=text], input[type=password]{flex:1; min-width:180px;}
+  button{background:var(--cyan); color:#04141a; border:none; border-radius:7px; padding:9px 16px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; cursor:pointer; letter-spacing:0.3px; transition:transform .1s, filter .15s;}
+  button:hover{filter:brightness(1.08);}
+  button:active{transform:scale(0.98);}
+  button.secondary{background:transparent; border:1px solid var(--line); color:var(--text);}
+  button.ghost{background:transparent; border:1px solid var(--line); color:var(--muted); padding:6px 10px; font-size:11px;}
+
+  .verify-result{margin-top:12px; font-size:12.5px; padding:10px 12px; border-radius:7px; display:none;}
+  .verify-result.show{display:block;}
+  .verify-result.pass{background:rgba(70,209,122,0.08); border:1px solid rgba(70,209,122,0.4); color:var(--green);}
+  .verify-result.fail{background:rgba(255,84,112,0.08); border:1px solid rgba(255,84,112,0.4); color:var(--red);}
+  .verify-result.info{background:rgba(107,118,136,0.1); border:1px solid var(--line); color:var(--muted);}
+
+  .rebuild-out{margin-top:12px;}
+  .token-display{background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:12px; font-size:11.5px; word-break:break-all; line-height:1.7;}
+  .t-h{color:var(--violet);} .t-p{color:var(--cyan);} .t-s{color:var(--amber);}
+
+  .hint{color:var(--muted); font-size:11px; margin-top:8px; line-height:1.6;}
+  .footer{margin-top:40px; text-align:center; color:var(--muted); font-size:11px; border-top:1px solid var(--line); padding-top:18px;}
+  .footer b{color:var(--text);}
+  code{background:var(--panel-2); padding:1px 5px; border-radius:4px; font-size:11px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">JW</div>
+      <div>
+        <h1>JWT Inspector</h1>
+        <div class="tagline">Decode · flag weaknesses · verify · rebuild — entirely in your browser, nothing leaves this tab</div>
+      </div>
+    </div>
+    <div class="credit">© 2026 <b>Pratik S.</b><br>local-only JWT diagnostic tool</div>
+  </header>
+
+  <div id="scanstrip" class="scanstrip">
+    <div class="seg empty" style="flex:1">paste a token below to begin scanning</div>
+    <div class="scanline"></div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: INSPECTOR -->
+    <div>
+      <div class="panel">
+        <h2><span><span class="eyebrow-dot"></span>Token Input</span></h2>
+        <textarea id="tokenInput" class="token-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...." spellcheck="false"></textarea>
+        <div class="row">
+          <button onclick="decodeToken()">Decode</button>
+          <button class="secondary" onclick="loadSample()">Load sample</button>
+          <button class="secondary" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Header</h2>
+        <pre id="headerView" class="jsonview">—</pre>
+      </div>
+
+      <div class="panel">
+        <h2>Payload</h2>
+        <pre id="payloadView" class="jsonview">—</pre>
+      </div>
+
+      <div class="panel">
+        <h2>Security Flags</h2>
+        <div id="flags" class="flags">
+          <div class="flag ok"><span class="ic">•</span><span>Paste a token above to run diagnostics.</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Signature Verification</h2>
+        <div class="row">
+          <input type="password" id="secretInput" placeholder="candidate secret (HS256 / HS384 / HS512 only)">
+          <button onclick="verifySignature()">Verify</button>
+        </div>
+        <div id="verifyResult" class="verify-result"></div>
+        <div class="hint">Asymmetric algorithms (RS256/ES256/etc.) need a public key, not a secret — this tool only verifies HMAC signatures locally via the browser's Web Crypto API. Nothing is sent over the network.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: REBUILDER -->
+    <div>
+      <div class="panel">
+        <h2><span><span class="eyebrow-dot"></span>Rebuild / Forge a Token</span></h2>
+        <div class="hint" style="margin-top:-4px; margin-bottom:10px;">Edit the JSON below, pick an algorithm, and generate a fresh token — a local jwt.io-style workbench for testing your own services.</div>
+
+        <div style="margin-bottom:12px;">
+          <div class="label" style="font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Header JSON</div>
+          <textarea id="rbHeader" style="min-height:70px; color:var(--violet);">{
+  "alg": "HS256",
+  "typ": "JWT"
+}</textarea>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div class="label" style="font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Payload JSON</div>
+          <textarea id="rbPayload" style="min-height:120px; color:var(--cyan);">{
+  "sub": "user_1234",
+  "name": "Ada Lovelace",
+  "aud": "my-app",
+  "iat": 1751500000,
+  "exp": 1783036000
+}</textarea>
+        </div>
+
+        <div class="row">
+          <select id="rbAlg" onchange="syncAlgToHeader()">
+            <option value="HS256">HS256</option>
+            <option value="HS384">HS384</option>
+            <option value="HS512">HS512</option>
+            <option value="none">none (unsigned — insecure)</option>
+          </select>
+          <input type="password" id="rbSecret" placeholder="signing secret (skip for alg: none)">
+          <button onclick="rebuildToken()">Generate Token</button>
+        </div>
+
+        <div id="rbOut" class="rebuild-out" style="display:none;">
+          <div class="label" style="font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Generated token</div>
+          <div id="rbTokenDisplay" class="token-display"></div>
+          <div class="row">
+            <button class="secondary" id="copyBtn" onclick="copyRebuilt(event)">Copy</button>
+            <button class="secondary" onclick="sendRebuiltToInspector()">Send to inspector ↑</button>
+          </div>
+        </div>
+        <div id="rbError" class="verify-result fail"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Quick Reference</h2>
+        <div class="hint" style="margin-top:0;">
+          <b style="color:var(--text)">Recommended:</b> HS256/384/512 (shared secret), RS256/384/512 &amp; ES256/384/512 (public/private key pairs).<br><br>
+          <b style="color:var(--text)">Avoid:</b> <code>alg: none</code> (no signature at all — critical if your verifier accepts it), and never trust the <code>alg</code> header from an untrusted token without pinning the expected algorithm server-side.<br><br>
+          <b style="color:var(--text)">Always check:</b> <code>exp</code> (expiry), <code>aud</code> (intended recipient), <code>iss</code> (issuer), and <code>nbf</code> (not-before) — a valid signature alone doesn't mean a token should be accepted.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">JWT Inspector — a local, offline JWT decode/verify/rebuild workbench. © 2026 <b>Pratik S.</b> All tokens are processed client-side only.</div>
+</div>
+
+<script>
+// ---------- base64url helpers ----------
+function b64urlDecode(str){
+  str = str.replace(/-/g,'+').replace(/_/g,'/');
+  while(str.length % 4) str += '=';
+  const bin = atob(str);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function b64urlEncodeBytes(bytes){
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlEncodeStr(str){
+  return b64urlEncodeBytes(new TextEncoder().encode(str));
+}
+function bytesToText(bytes){ return new TextDecoder().decode(bytes); }
+
+// ---------- JSON syntax highlight ----------
+function highlightJSON(obj){
+  const json = JSON.stringify(obj, null, 2);
+  return json
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\.|[^"\\])*")(\s*:)?/g, (match, p1, p2, colon) => {
+      if(colon) return `<span class="jk">${p1}</span>${colon}`;
+      return `<span class="jv-str">${p1}</span>`;
+    })
+    .replace(/\b(true|false)\b/g, '<span class="jv-bool">$1</span>')
+    .replace(/\bnull\b/g, '<span class="jv-null">null</span>')
+    .replace(/\b(-?\d+(\.\d+)?)\b(?![^<]*>)/g, '<span class="jv-num">$1</span>');
+}
+
+const WEAK_ALGS = ['none', 'HS1'];
+const RECOMMENDED_ALGS = ['HS256','HS384','HS512','RS256','RS384','RS512','ES256','ES384','ES512','PS256','PS384','PS512'];
+
+function fmtTime(ts){
+  if(typeof ts !== 'number') return null;
+  const d = new Date(ts*1000);
+  return d.toISOString().replace('T',' ').replace('.000Z',' UTC');
+}
+
+let lastDecoded = null;
+
+function decodeToken(){
+  const raw = document.getElementById('tokenInput').value.trim();
+  const headerView = document.getElementById('headerView');
+  const payloadView = document.getElementById('payloadView');
+  const flagsEl = document.getElementById('flags');
+  const strip = document.getElementById('scanstrip');
+
+  if(!raw){
+    headerView.textContent = '—';
+    payloadView.textContent = '—';
+    flagsEl.innerHTML = '<div class="flag ok"><span class="ic">•</span><span>Paste a token above to run diagnostics.</span></div>';
+    strip.innerHTML = '<div class="seg empty" style="flex:1">paste a token below to begin scanning</div><div class="scanline"></div>';
+    return;
+  }
+
+  const parts = raw.split('.');
+  if(parts.length < 2){
+    headerView.innerHTML = '<span class="jv-null">Not a valid JWT — expected header.payload[.signature]</span>';
+    payloadView.textContent = '—';
+    flagsEl.innerHTML = '<div class="flag crit"><span class="ic">✕</span><span>Malformed token — could not split into header/payload/signature segments.</span></div>';
+    return;
+  }
+
+  let header, payload, headerErr = null, payloadErr = null;
+  try{ header = JSON.parse(bytesToText(b64urlDecode(parts[0]))); }
+  catch(e){ headerErr = e.message; }
+  try{ payload = JSON.parse(bytesToText(b64urlDecode(parts[1]))); }
+  catch(e){ payloadErr = e.message; }
+
+  headerView.innerHTML = header ? highlightJSON(header) : `<span class="jv-null">Could not decode header: ${headerErr}</span>`;
+  payloadView.innerHTML = payload ? highlightJSON(payload) : `<span class="jv-null">Could not decode payload: ${payloadErr}</span>`;
+
+  // scan strip proportional
+  const hLen = parts[0]?.length || 0, pLen = parts[1]?.length || 0, sLen = parts[2]?.length || 0;
+  const total = Math.max(hLen+pLen+sLen, 1);
+  strip.innerHTML = `
+    <div class="seg header" style="flex:0 0 ${Math.max(hLen/total*100,12)}%">header</div>
+    <div class="seg payload" style="flex:0 0 ${Math.max(pLen/total*100,20)}%">payload</div>
+    <div class="seg ${sLen? 'signature':'empty'}" style="flex:0 0 ${sLen? Math.max(sLen/total*100,12):20}%">${sLen? 'signature':'no signature'}</div>
+    <div class="scanline"></div>`;
+  strip.classList.add('scanning');
+  setTimeout(()=>strip.classList.remove('scanning'), 2200);
+
+  lastDecoded = {header, payload, parts};
+  renderFlags(header, payload, parts, headerErr, payloadErr);
+}
+
+function renderFlags(header, payload, parts, headerErr, payloadErr){
+  const flags = [];
+  const now = Math.floor(Date.now()/1000);
+
+  if(headerErr || payloadErr){
+    flags.push(['crit','✕', 'Token segments failed to decode as base64url JSON — the token is likely malformed or truncated.']);
+  }
+
+  if(header){
+    const alg = header.alg;
+    if(alg === undefined){
+      flags.push(['crit','✕', 'Header is missing "alg" — a spec-compliant verifier should reject this outright.']);
+    } else if(String(alg).toLowerCase() === 'none'){
+      flags.push(['crit','✕', '<span class="label">alg: none</span> This token claims no signature is required. If a server accepts this, authentication can be bypassed entirely (CVE-class "alg:none" vulnerability).']);
+    } else if(WEAK_ALGS.includes(alg)){
+      flags.push(['crit','✕', `Algorithm "${alg}" is considered weak/deprecated and should not be trusted.`]);
+    } else if(!RECOMMENDED_ALGS.includes(alg)){
+      flags.push(['warn','!', `Algorithm "${alg}" is non-standard or unrecognized — verify your library actually supports it safely before trusting this token.`]);
+    } else {
+      flags.push(['ok','✓', `Algorithm "${alg}" is a recognized, currently-recommended signing algorithm.`]);
+    }
+
+    if(!parts[2] && String(alg).toLowerCase() !== 'none'){
+      flags.push(['crit','✕', `Algorithm is "${alg}" but no signature segment is present.`]);
+    }
+  }
+
+  if(payload){
+    if(payload.exp === undefined){
+      flags.push(['warn','!', 'Missing "exp" — this token never expires unless enforced elsewhere. Long-lived tokens increase the blast radius if leaked.']);
+    } else {
+      if(payload.exp < now){
+        flags.push(['crit','✕', `Token is expired. exp = ${fmtTime(payload.exp)} (${Math.round((now-payload.exp)/60)} min ago).`]);
+      } else {
+        flags.push(['ok','✓', `Not expired. exp = ${fmtTime(payload.exp)}.`]);
+      }
+    }
+
+    if(payload.aud === undefined){
+      flags.push(['warn','!', 'Missing "aud" — without an audience claim, this token could potentially be replayed against a different service than intended.']);
+    } else {
+      flags.push(['ok','✓', `Audience present: ${Array.isArray(payload.aud) ? payload.aud.join(', ') : payload.aud}`]);
+    }
+
+    if(payload.iat === undefined){
+      flags.push(['warn','!', 'Missing "iat" (issued-at) — harder to audit token age or detect clock/replay anomalies.']);
+    }
+
+    if(payload.nbf !== undefined && payload.nbf > now){
+      flags.push(['warn','!', `Token is not valid yet. nbf = ${fmtTime(payload.nbf)}.`]);
+    }
+
+    if(payload.iss === undefined){
+      flags.push(['warn','!', 'Missing "iss" (issuer) — cannot confirm which authority minted this token.']);
+    }
+  }
+
+  const flagsEl = document.getElementById('flags');
+  flagsEl.innerHTML = flags.map(([sev,ic,msg]) =>
+    `<div class="flag ${sev}"><span class="ic">${ic}</span><span>${msg}</span></div>`
+  ).join('') || '<div class="flag ok"><span class="ic">✓</span><span>No issues detected.</span></div>';
+}
+
+function loadSample(){
+  // header: {"alg":"HS256","typ":"JWT"} payload includes exp/aud/iat, signed with secret "sample-secret"
+  document.getElementById('tokenInput').value =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEyMzQiLCJuYW1lIjoiQWRhIExvdmVsYWNlIiwiYXVkIjoibXktYXBwIiwiaWF0IjoxNzUxNTAwMDAwLCJleHAiOjE3ODMwMzYwMDB9.dK1yQrKQOZ6f5rIuVJHhqL3sM2q3zH1F0m4y6bR9v0w';
+  decodeToken();
+}
+function clearAll(){
+  document.getElementById('tokenInput').value = '';
+  document.getElementById('secretInput').value = '';
+  document.getElementById('verifyResult').className = 'verify-result';
+  decodeToken();
+}
+
+// ---------- HMAC verification via Web Crypto ----------
+const HASH_FOR_ALG = { HS256:'SHA-256', HS384:'SHA-384', HS512:'SHA-512' };
+
+async function verifySignature(){
+  const resultEl = document.getElementById('verifyResult');
+  resultEl.className = 'verify-result show info';
+
+  if(!lastDecoded || !lastDecoded.header){
+    resultEl.className = 'verify-result show fail';
+    resultEl.textContent = 'Decode a token first.';
+    return;
+  }
+  const alg = lastDecoded.header.alg;
+  const secret = document.getElementById('secretInput').value;
+  const parts = lastDecoded.parts;
+
+  if(String(alg).toLowerCase() === 'none'){
+    resultEl.className = 'verify-result show fail';
+    resultEl.textContent = 'alg is "none" — there is no signature to verify. Treat this token as unauthenticated.';
+    return;
+  }
+  if(!HASH_FOR_ALG[alg]){
+    resultEl.className = 'verify-result show info';
+    resultEl.textContent = `"${alg}" is an asymmetric or unsupported algorithm — this tool can only verify HMAC (HS256/384/512) locally, since asymmetric verification needs a public key, not a secret.`;
+    return;
+  }
+  if(!secret){
+    resultEl.className = 'verify-result show fail';
+    resultEl.textContent = 'Enter a candidate secret to verify against.';
+    return;
+  }
+  if(!parts[2]){
+    resultEl.className = 'verify-result show fail';
+    resultEl.textContent = 'Token has no signature segment to verify.';
+    return;
+  }
+
+  try{
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(secret),
+      { name:'HMAC', hash: HASH_FOR_ALG[alg] },
+      false, ['sign']
+    );
+    const signingInput = new TextEncoder().encode(parts[0] + '.' + parts[1]);
+    const sigBuf = await crypto.subtle.sign('HMAC', key, signingInput);
+    const computed = b64urlEncodeBytes(new Uint8Array(sigBuf));
+
+    if(computed === parts[2]){
+      resultEl.className = 'verify-result show pass';
+      resultEl.textContent = `✓ Signature is VALID for this secret under ${alg}.`;
+    } else {
+      resultEl.className = 'verify-result show fail';
+      resultEl.textContent = `✕ Signature does NOT match — this secret does not produce this token's signature under ${alg}.`;
+    }
+  } catch(e){
+    resultEl.className = 'verify-result show fail';
+    resultEl.textContent = 'Verification error: ' + e.message;
+  }
+}
+
+// ---------- Rebuild / forge ----------
+function syncAlgToHeader(){
+  try{
+    const h = JSON.parse(document.getElementById('rbHeader').value);
+    h.alg = document.getElementById('rbAlg').value;
+    document.getElementById('rbHeader').value = JSON.stringify(h, null, 2);
+  }catch(e){ /* leave header as-is if it's not valid JSON yet */ }
+}
+
+async function rebuildToken(){
+  const errEl = document.getElementById('rbError');
+  const outEl = document.getElementById('rbOut');
+  errEl.className = 'verify-result';
+  outEl.style.display = 'none';
+
+  let header, payload;
+  try{ header = JSON.parse(document.getElementById('rbHeader').value); }
+  catch(e){ errEl.className='verify-result show fail'; errEl.textContent='Header is not valid JSON: '+e.message; return; }
+  try{ payload = JSON.parse(document.getElementById('rbPayload').value); }
+  catch(e){ errEl.className='verify-result show fail'; errEl.textContent='Payload is not valid JSON: '+e.message; return; }
+
+  const alg = document.getElementById('rbAlg').value;
+  header.alg = alg;
+  const secret = document.getElementById('rbSecret').value;
+
+  const encHeader = b64urlEncodeStr(JSON.stringify(header));
+  const encPayload = b64urlEncodeStr(JSON.stringify(payload));
+  const signingInput = `${encHeader}.${encPayload}`;
+
+  let signature = '';
+  if(alg === 'none'){
+    signature = '';
+  } else if(HASH_FOR_ALG[alg]){
+    if(!secret){
+      errEl.className='verify-result show fail';
+      errEl.textContent = `Enter a secret to sign with ${alg}, or switch algorithm to "none".`;
+      return;
+    }
+    try{
+      const key = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(secret),
+        { name:'HMAC', hash: HASH_FOR_ALG[alg] },
+        false, ['sign']
+      );
+      const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
+      signature = b64urlEncodeBytes(new Uint8Array(sigBuf));
+    } catch(e){
+      errEl.className='verify-result show fail';
+      errEl.textContent = 'Signing error: ' + e.message;
+      return;
+    }
+  }
+
+  const token = alg === 'none' ? `${signingInput}.` : `${signingInput}.${signature}`;
+  const disp = document.getElementById('rbTokenDisplay');
+  disp.innerHTML = `<span class="t-h">${encHeader}</span>.<span class="t-p">${encPayload}</span>.<span class="t-s">${signature}</span>`;
+  disp.dataset.token = token;
+  outEl.style.display = 'block';
+
+  if(alg === 'none'){
+    errEl.className = 'verify-result show fail';
+    errEl.textContent = '⚠ Generated with alg: none — this token carries no signature. Use only for testing that your own verifier correctly rejects it.';
+  }
+}
+
+function flashButton(btn, label){
+  if(!btn) return;
+  const orig = btn.textContent;
+  btn.textContent = label;
+  setTimeout(()=>{ btn.textContent = orig; }, 1400);
+}
+
+function fallbackCopy(text){
+  // Works even when navigator.clipboard is blocked (e.g. inside a sandboxed iframe)
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.top = '-1000px';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+async function copyRebuilt(evt){
+  const btn = (evt && evt.target) || document.getElementById('copyBtn');
+  const token = document.getElementById('rbTokenDisplay').dataset.token || '';
+  if(!token){
+    flashButton(btn, 'Nothing to copy');
+    return;
+  }
+
+  let success = false;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(token);
+      success = true;
+    }
+  }catch(e){ success = false; }
+
+  if(!success){
+    success = fallbackCopy(token);
+  }
+
+  flashButton(btn, success ? 'Copied ✓' : 'Copy failed — select manually');
+
+  if(!success){
+    // As a last resort, select the token text on screen so the user can Ctrl/Cmd+C it themselves
+    const disp = document.getElementById('rbTokenDisplay');
+    const range = document.createRange();
+    range.selectNodeContents(disp);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+function sendRebuiltToInspector(){
+  const token = document.getElementById('rbTokenDisplay').dataset.token || '';
+  if(!token) return;
+  document.getElementById('tokenInput').value = token;
+  decodeToken();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// initial state
+decodeToken();
+</script>
+</body>
+</html>
